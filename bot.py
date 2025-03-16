@@ -35,31 +35,49 @@ ANSWER_KEYS = {
     "09s2": "https://json.extendsclass.com/bin/760b804b0fd8",
 }
 
+# Headers to mimic a real browser request
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Referer": "https://jeemain.nta.ac.in/",
+}
+
 # Function to fetch and process the response sheet
 async def process_response_sheet(url):
     try:
-        # Fetch the response sheet HTML
-        response = requests.get(url)
+        logger.info(f"Fetching response sheet from URL: {url}")
+        response = requests.get(url, headers=HEADERS)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
 
         # Extract session and shift information
         table_rows = soup.select("table tbody tr")
+        if len(table_rows) < 5:
+            return "Invalid response sheet format. Could not find session and shift information."
+
         session = table_rows[3].select_one("td:last-child").text.strip().split("/")[0]
         shift = "1" if "am" in table_rows[4].select_one("td:last-child").text.strip().lower() else "2"
         key = f"{session}s{shift}"
+        logger.info(f"Session: {session}, Shift: {shift}, Key: {key}")
 
         # Fetch the answer key
         answer_key_url = ANSWER_KEYS.get(key)
         if not answer_key_url:
-            return "Answer key not found for this session and shift."
+            return f"Answer key not found for this session and shift: {key}."
 
-        answer_key = requests.get(answer_key_url).json()
+        logger.info(f"Fetching answer key from URL: {answer_key_url}")
+        answer_key_response = requests.get(answer_key_url, headers=HEADERS)
+        answer_key_response.raise_for_status()
+        answer_key = answer_key_response.json()
 
         # Process the response sheet
         results = []
         for table in soup.select("table.menu-tbl > tbody"):
             rows = table.select("tr")
+            if len(rows) < 8:
+                continue
+
             question_type = rows[0].select_one("td:last-child").text.strip()
             question_id = rows[1].select_one("td:last-child").text.strip()
             options = [rows[i].select_one("td:last-child").text.strip() for i in range(2, 6)]
@@ -98,13 +116,16 @@ async def process_response_sheet(url):
         )
         return result_message
 
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Network error: {e}")
+        return "Failed to fetch data. Please check your internet connection and try again."
     except Exception as e:
         logger.error(f"Error processing response sheet: {e}")
         return "Failed to process the response sheet. Please check the URL and try again."
 
 # Start command handler
 async def start(update: Update, context):
-    await update.message.reply_text("Welcome! Please send me your JEE response sheet URL.")
+    await update.message.reply_text("Wel! Please send me your JEE response sheet URL.")
 
 # Message handler
 async def handle_message(update: Update, context):
