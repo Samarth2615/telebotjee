@@ -125,7 +125,7 @@ async def process_response_sheet(url):
 
 # Start command handler
 async def start(update: Update, context):
-    await update.message.reply_text("Wel! Please send me your JEE response sheet URL.")
+    await update.message.reply_text("Welcome! Please send me your JEE response sheet URL.")
 
 # Message handler
 async def handle_message(update: Update, context):
@@ -141,7 +141,7 @@ async def handle_message(update: Update, context):
 # Main function
 def main():
     # Create the Application and pass it your bot's token
-    application = ApplicationBuilder().token("7764897543:AAHK21kJDyFD4KrrQW9gcj5aNuKhpvJfM0o").build()
+    application = ApplicationBuilder().token("YOUR_TELEGRAM_BOT_TOKEN").build()
 
     # Add handlers
     application.add_handler(CommandHandler("start", start))
@@ -151,4 +151,9 @@ def main():
     application.run_polling()
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        logger.info("Bot stopped by user.")
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
