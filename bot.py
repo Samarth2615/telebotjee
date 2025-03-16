@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 
 # Bot Token from @BotFather
-BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+BOT_TOKEN = "TELEGRAM_BOT_TOKEN"
 
 # Answer key URLs for different shifts
 ANSWER_KEYS = {
