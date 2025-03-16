@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: jee-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: YOUR_TELEGRAM_BOT_TOKEN
+        value: 7764897543:AAHK21kJDyFD4KrrQW9gcj5aNuKhpvJfM0o
