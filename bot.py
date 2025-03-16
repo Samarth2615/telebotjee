@@ -1,12 +1,14 @@
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 import os
 import requests
+import cloudscraper
 from bs4 import BeautifulSoup
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+# Bot Token from @BotFather
+BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
 
-# Dictionary mapping date + shift to answer key URLs
+# Answer key URLs for different shifts
 ANSWER_KEYS = {
     "22s1": "https://raw.githubusercontent.com/Samarth2615/finaljeescrapper/refs/heads/main/Key.json",
     "27s2": "https://json.extendsclass.com/bin/fefdb99829ed",
@@ -18,40 +20,40 @@ ANSWER_KEYS = {
     "31s2": "https://json.extendsclass.com/bin/a6a0bd4c830b",
     "01s1": "https://json.extendsclass.com/bin/2902b9729668",
     "01s2": "https://json.extendsclass.com/bin/d2ba75006751",
-    "04s1": "https://json.extendsclass.com/bin/e02a72e68a41",
-    "04s2": "https://json.extendsclass.com/bin/d45bb3017d92",
-    "05s1": "https://json.extendsclass.com/bin/f0a2446e7f12",
-    "05s2": "https://json.extendsclass.com/bin/9a5213793a4e",
-    "06s1": "https://json.extendsclass.com/bin/2508ed9bac9a",
-    "06s2": "https://json.extendsclass.com/bin/b3f147fa1f70",
-    "08s1": "https://json.extendsclass.com/bin/497e7d9b9d04",
-    "08s2": "https://json.extendsclass.com/bin/a54406466af0",
-    "09s1": "https://json.extendsclass.com/bin/59f50c0b8bf4",
-    "09s2": "https://json.extendsclass.com/bin/760b804b0fd8"
 }
 
+# Create a CloudScraper instance to bypass Cloudflare
+scraper = cloudscraper.create_scraper()
+
+
 async def start(update: Update, context: CallbackContext):
-    """Start command handler"""
-    await update.message.reply_text("Hello! Send me your JEE response sheet URL.")
+    """Handles /start command."""
+    await update.message.reply_text("Welcome to the JEE Score Bot! Send your response sheet URL to analyze your score.")
+
 
 async def process_response(update: Update, context: CallbackContext):
-    """Process JEE response sheet URL"""
+    """Processes the JEE response sheet URL and calculates score."""
     url = update.message.text.strip()
-    
+
     if not url.startswith("https://"):
         await update.message.reply_text("Invalid URL! Please send a valid JEE response sheet URL.")
         return
 
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+
     try:
-        response = requests.get(url)
+        response = scraper.get(url, headers=headers, timeout=10)
         response.raise_for_status()
-    except requests.RequestException:
+    except requests.RequestException as e:
+        print("Error fetching response sheet:", e)
         await update.message.reply_text("Failed to fetch the response sheet. Please check the URL.")
         return
 
     soup = BeautifulSoup(response.text, "html.parser")
-    
-    # Extract shift and date from response sheet
+
+    # Extract shift and date
     table_rows = soup.select("table tbody tr")
     if len(table_rows) < 5:
         await update.message.reply_text("Failed to extract test details from the response sheet.")
@@ -65,11 +67,13 @@ async def process_response(update: Update, context: CallbackContext):
         await update.message.reply_text("Answer key for your test is not available yet.")
         return
 
+    # Fetch answer key
     try:
-        key_response = requests.get(ANSWER_KEYS[test_key])
+        key_response = requests.get(ANSWER_KEYS[test_key], timeout=10)
         key_response.raise_for_status()
         answer_key = key_response.json()
-    except requests.RequestException:
+    except requests.RequestException as e:
+        print("Error fetching answer key:", e)
         await update.message.reply_text("Failed to fetch the answer key.")
         return
 
@@ -93,7 +97,7 @@ async def process_response(update: Update, context: CallbackContext):
     # Calculate results
     correct = sum(1 for q in questions if q["score"] == 4)
     incorrect = sum(1 for q in questions if q["score"] == -1)
-    unattempted = sum(1 for q in questions if q["marked"] == "")
+    unattempted = sum(1 for q in questions if not q["marked"])
     total_score = sum(q["score"] for q in questions)
 
     result_text = (
@@ -107,15 +111,17 @@ async def process_response(update: Update, context: CallbackContext):
 
     await update.message.reply_text(result_text)
 
+
 def main():
-    """Main function to start the bot"""
-    app = Application.builder().token(TOKEN).build()
-    
+    """Starts the bot."""
+    app = Application.builder().token(BOT_TOKEN).build()
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_response))
 
     print("Bot is running...")
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()
